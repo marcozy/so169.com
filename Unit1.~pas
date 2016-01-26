@@ -1,0 +1,113 @@
+unit Unit1;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  Dialogs, StdCtrls, ExtCtrls, ComCtrls,formload,openvpn, IdBaseComponent,
+  IdComponent, IdIPWatch;
+
+type
+
+  TForm1 = class(TForm)
+    StatusBar1: TStatusBar;
+    GroupBox1: TGroupBox;
+    Edit1: TEdit;
+    Edit2: TEdit;
+    CheckBox1: TCheckBox;
+    Button1: TButton;
+    ComboBox1: TComboBox;
+    ComboBox2: TComboBox;
+    procedure FormCreate(Sender: TObject);
+    procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+    procedure Button1Click(Sender: TObject);
+    procedure Edit1Enter(Sender: TObject);
+    procedure Edit2Enter(Sender: TObject);
+
+    
+  private
+    { Public declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  Form1: TForm1;
+  username:Boolean;
+  password:Boolean;
+
+implementation
+
+
+
+{$R *.dfm}
+{$R uac.res}
+
+procedure TForm1.FormCreate(Sender: TObject);
+var
+downurl:string;
+begin
+  downurl:=GetWebPage(pchar('http://www.5high.net/server1.php'));
+  form_load1;
+  form_load2;
+  showmessage(downurl);
+end;
+
+
+
+procedure TForm1.Button1Click(Sender: TObject);
+begin
+  if button1.caption = '连接' then
+  begin
+      OVPN('"' + ExtractFilePath(Application.ExeName) + 'openvpn.exe" --config 1.ovpn',
+      extractfiledir(Application.ExeName))
+  end else
+  if button1.caption = '断开' then
+  begin
+    CVPN;
+  end;
+end;
+
+
+
+procedure TForm1.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+begin
+if MessageBox(Handle, '确认要退出并断开吗?', '疾风OpenVPN', MB_YESNO or MB_ICONQUESTION or MB_DEFBUTTON2) = IDYES then
+    begin
+        if CanClose = true then
+        begin
+          CVPN;
+          application.Terminate;
+        end;
+    end
+    else
+      begin
+        CanClose := false;
+      end;
+end;
+
+
+
+
+procedure TForm1.Edit1Enter(Sender: TObject);
+begin
+  if not username then
+    begin
+    form1.Edit1.Text := '';
+    username := true;
+    end;
+end;
+
+procedure TForm1.Edit2Enter(Sender: TObject);
+begin
+  if not password then
+    begin
+    form1.Edit2.Text := '';
+    form1.Edit2.PasswordChar :='*';
+    password := true;
+    end;
+end;
+
+
+
+end.

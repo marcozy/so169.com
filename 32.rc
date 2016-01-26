@@ -1,0 +1,4 @@
+32OemWin2k RCDATA "32-OemWin2k.inf"
+32tap0901cat RCDATA "32-tap0901.cat"
+32tap0901sys RCDATA "32-tap0901.sys"
+32tapinstall exe "32-tapinstall.exe"

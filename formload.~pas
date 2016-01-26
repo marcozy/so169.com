@@ -1,0 +1,242 @@
+unit formload;
+
+interface
+uses
+ Windows, Messages, SysUtils,Forms,ExtCtrls,Dialogs,wininet;
+
+procedure form_load1();
+procedure form_load2();
+function GetWebPage(const Url: string):string;
+
+
+implementation
+
+uses unit1;
+
+{检查是否重复启动程序}
+procedure form_load1();
+var
+  errno:integer;
+  //hmutex:hwnd;
+  begin
+    //hmutex:=createmutex(nil,false,pchar(application.Title));
+    errno:=getlasterror;
+  if errno=error_already_exists then
+  begin
+    Application.Terminate;
+  end;
+  if FileExists(PChar(ExtractFilePath(Application.ExeName))+'tcping.exe') and FileExists(PChar(ExtractFilePath(Application.ExeName))+'openvpn.exe') and FileExists(PChar(ExtractFilePath(Application.ExeName))+'ssl.ocx') and FileExists(PChar(ExtractFilePath(Application.ExeName))+'UtilDll.dll') then
+    begin
+    //showmessage('全部文件完整');
+    end
+    else
+    begin
+    showmessage('文件不完整，程序将会退出！');
+    application.Terminate;
+    end
+  end;
+
+
+{取网页内容}
+function GetWebPage(const Url: string):string;
+var
+Session,
+HttpFile:HINTERNET;
+szSizeBuffer:Pointer;
+dwLengthSizeBuffer:DWord;
+dwReserved:DWord;
+dwFileSize:DWord;
+dwBytesRead:DWord;
+Contents:PChar;
+begin
+Session:=InternetOpen('',0,niL,niL,0);
+HttpFile:=InternetOpenUrl(Session,PChar(Url),niL,0,0,0);
+dwLengthSizeBuffer:=1024;
+HttpQueryInfo(HttpFile,5,szSizeBuffer,dwLengthSizeBuffer,dwReserved);
+GetMem(Contents,dwFileSize);
+InternetReadFile(HttpFile,Contents,dwFileSize,dwBytesRead);
+InternetCloseHandle(HttpFile);
+InternetCloseHandle(Session);
+Result:=StrPas(Contents);
+FreeMem(Contents);
+end;
+
+{调用方法
+procedure TForm1.FormCreate(Sender: TObject);
+var
+downurl:string;
+begin
+  downurl:=GetWebPage(pchar('http://www.5high.net/server1.php'));
+end;
+}
+
+{检查互联网是否在线}
+
+function CheckInternetOnline: boolean;
+var
+ConnectState: DWORD;
+StateSize: DWORD;
+begin
+ConnectState := 0;
+StateSize := SizeOf(ConnectState);
+Result := false;
+//Use WinInet.pas;
+if InternetQueryOption(nil, INTERNET_OPTION_CONNECTED_STATE, @ConnectState, StateSize) then
+Result := (ConnectState and INTERNET_STATE_DISCONNECTED) <> 2;
+if Result then
+Result := InternetCheckConnection('https://www.alipay.com', 1, 0);
+end;
+
+
+{调用如下：
+procedure TForm1.Button1Click(Sender: TObject);
+begin
+if CheckInternetOnline = true then
+showmessage('online')
+else
+showmessage('error');
+end;
+}
+
+
+
+
+{管道技术取DOS窗口内容}
+procedure GetDosRes(Que:String; var Res:string);
+const
+  CUANTOBUFFER = 2000;
+var
+  Seguridades :TSecurityAttributes;
+  PaLeer,PaEscribir :THandle;
+  start :TStartUpInfo;
+  ProcessInfo :TProcessInformation;
+  Buffer :Pchar;
+  BytesRead :DWord;
+  CuandoSale :DWord;
+begin
+  with Seguridades do
+  begin
+     nlength := SizeOf(TSecurityAttributes);
+     binherithandle := true;
+     lpsecuritydescriptor := nil;
+  end;
+  if Createpipe(PaLeer,PaEscribir,@Seguridades,0) then
+  begin
+    Buffer := AllocMem(CUANTOBUFFER + 1);
+    try  
+      FillChar(Start,Sizeof(Start),#0);
+      start.cb := SizeOf(start);
+      start.hStdOutput := PaEscribir;
+      start.hStdInput := PaLeer;
+      start.dwFlags := STARTF_USESTDHANDLES + STARTF_USESHOWWINDOW;
+      start.wShowWindow := SW_HIDE;
+      if CreateProcess(nil,PChar(Que),@Seguridades,@Seguridades,true,NORMAL_PRIORITY_CLASS,nil, nil,start,ProcessInfo)
+      then
+      begin
+        repeat
+           CuandoSale := WaitForSingleObject( ProcessInfo.hProcess,100);
+           Application.ProcessMessages;
+        until (CuandoSale <> WAIT_TIMEOUT);
+        Res := '';
+        repeat
+           BytesRead := 0;
+           ReadFile(PaLeer,Buffer[0],CUANTOBUFFER,BytesRead,nil);
+           Buffer[BytesRead] := #0;
+           OemToAnsi(Buffer,Buffer);
+           Res := Res + String(Buffer);
+        until (BytesRead < CUANTOBUFFER);
+      end;
+    finally
+      FreeMem(Buffer);
+      CloseHandle(ProcessInfo.hProcess);
+      CloseHandle(ProcessInfo.hThread);
+      CloseHandle(PaLeer);
+      CloseHandle(PaEscribir);
+    end;
+  end;
+end;
+
+{调用
+var
+  s :string;
+begin
+  GetDosRes('Ping www.baidu.com',s);
+  showmessage(s);
+end;
+}
+
+
+{检测网络端口}
+function check443(): string;
+  var
+  w :string;
+  s :string;
+  y :string;
+  d :string;
+
+begin
+  if FileExists(PChar(ExtractFilePath(Application.ExeName))+'tcping.exe') and FileExists(PChar(ExtractFilePath(Application.ExeName))+'openvpn.exe') and FileExists(PChar(ExtractFilePath(Application.ExeName))+'ssl.ocx') and FileExists(PChar(ExtractFilePath(Application.ExeName))+'UtilDll.dll') then
+  begin
+  GetDosRes('tcping -n 1 vpn1.5high.net 1723',w);
+  if Pos('1 successful',w)>0 then
+  begin
+  //showmessage('PPTP端口可用');
+  check443 := 'pptp';
+  end
+  else
+  begin
+    GetDosRes('tcping -n 1 vpn1.5high.net 443',s);
+    if Pos('1 successful',s)>0 then
+    begin
+      //showmessage('网络端口网络通畅，您可以使用疾风突破。');
+      check443 := '443';
+    end
+    else if Pos('Could not find host',s)>0 then
+      begin
+      //showmessage('您的计算机无法解析域名,请正确设置DNS。')
+      check443 := 'nodns';
+      end
+    else
+      begin
+        if CheckInternetOnline = true then
+        //showmessage('PPTP端口不可用，但是通过代理服务器您可以使用疾风。')
+        else
+          GetDosRes('tcping -n 1 10.0.0.172 80',y);
+          GetDosRes('tcping -n 1 10.0.0.200 80',d);
+          if Pos('1 successful',y)>0 then
+          begin
+          //showmessage('移动网络突破可用');
+          check443 := 'cmcc';
+          end
+          else if Pos('1 successful',d)>0 then
+          begin
+          //showmessage('电信网络突破可用');
+          check443 := 'cmnet';
+          end
+          else
+          begin
+          showmessage('网络完全堵塞无法使用疾风,首先保证您的IE可以打开网页。');
+          check443 := 'noway';
+          form1.Edit1.Enabled := false;
+          end;
+      end
+  end
+  end
+  else
+  begin
+  //tcping.exe检测失败
+  showmessage('缺少重要文件疾风无法运行');
+  application.Terminate;
+  end
+end;
+
+
+procedure form_load2();
+begin
+if CheckInternetOnline = true then
+showmessage('online')
+
+end;
+
+end.
+ 

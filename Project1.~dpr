@@ -1,0 +1,18 @@
+program Project1;
+
+uses
+  Forms,
+  Unit1 in 'Unit1.pas' {Form1},
+  checkedit in 'checkedit.pas',
+  connect in 'connect.pas',
+  formload in 'formload.pas',
+  checkonline in 'checkonline.pas',
+  FormMain in 'FormMain.pas',
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.CreateForm(TForm1, Form1);
+  Application.Run;
+end.

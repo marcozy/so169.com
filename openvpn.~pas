@@ -1,0 +1,202 @@
+unit openvpn;
+
+interface
+
+uses
+  Windows, SysUtils, Forms, Dialogs;
+
+type
+  TOnConsoleOutput = procedure(const OutputStr: string); stdcall;
+
+procedure OnConsoleOutput(const OutputStr: string); stdcall;
+function OVPN(CmdLine: string; WorkDir: string = ''): Boolean;
+procedure Cvpn;
+
+function OpenConsole(CmdLine: PChar; WorkDir: PChar; ShowWindow: Word;
+  pProcInfo: PProcessInformation; OnConsoleOutput: TOnConsoleOutput): Integer; stdcall; external 'UtilDll.dll';
+function ConsoleInput(ConsoleIdx: Integer; InputStr: PChar): LongBool; stdcall; external 'UtilDll.dll';
+function CloseConsole(ConsoleIdx: Integer): Integer; stdcall; external 'UtilDll.dll';
+function ConsoleInputF4(ConsoleIdx: Integer): Integer; stdcall; external 'UtilDll.dll';
+
+var
+    ConsoleIdx: Integer;
+    ProcInfo: TProcessInformation;
+    UserNameSent: Boolean;
+    PasswordSent: Boolean;
+    Completed: Boolean;
+    SIGTERM: Boolean;
+    wrong:Boolean;
+    RESOLVE:Boolean;
+
+implementation
+
+uses unit1;
+
+
+procedure OnConsoleOutput(const OutputStr: string); stdcall;
+begin
+  // 以下开始分析显示数据，并自动做相应操作。
+
+  // 是否处于用户名输入界面
+  if Pos('Enter Auth Username:', OutputStr) <> 0 then
+  begin
+    // 如果还未发送用户名，则发送用户名。
+    if not UserNameSent then
+    begin
+      UserNameSent := True;
+      ConsoleInput(ConsoleIdx, PAnsiChar(form1.Edit1.Text + #13)); //PAnsiChar(form1.Edit1.Text + #13));
+    end;
+  end;
+
+  // 是否处于密码输入界面
+  if Pos('Enter Auth Password:', OutputStr) <> 0 then
+  begin
+    // 如果还未发送密码，则发送密码。
+    if not PasswordSent then
+    begin
+      PasswordSent := True;
+      ConsoleInput(ConsoleIdx, PAnsiChar(form1.Edit2.Text + #13));
+    end;
+  end;
+
+  if Pos('Initialization Sequence Completed', OutputStr) <> 0 then
+  begin
+    // 检测连接是否成功。
+    if not Completed then
+    begin
+      Completed := True;
+      //showmessage('连接成功');
+      form1.Button1.caption := '断开';
+      form1.Button1.Enabled := true;
+    end;
+  end;
+
+  if Pos('SIGTERM[hard,] received, process exiting', OutputStr) <> 0 then
+  begin
+    if not SIGTERM then
+    begin
+      SIGTERM := True;
+      form1.Button1.caption := '连接';
+      form1.Button1.Enabled := true;
+    end;
+  end;
+
+  if Pos('SIGUSR1[soft,connection-reset] received', OutputStr) <> 0 then
+  begin
+    if not wrong then
+    begin
+      wrong := True;
+      showmessage('用户名密码错误！');
+      form1.Button1.caption := '连接';
+      form1.Button1.Enabled := true;
+      // should close before re-open.
+      CVPN;
+    end;
+  end;
+
+
+  if Pos('RESOLVE: Cannot resolve host address', OutputStr) <> 0 then
+  begin
+    if not RESOLVE then
+    begin
+      RESOLVE := True;
+      showmessage('无法解析DNS！');
+      form1.Button1.caption := '连接';
+      form1.Button1.Enabled := true;
+      // should close before re-open.
+      CVPN;
+    end;
+  end;
+
+
+end;
+
+
+{启动openvpn}
+function OVPN(CmdLine: string; WorkDir: string = ''): Boolean;
+//var
+//  CmdLine: PChar;
+//  WorkDir: PChar;
+begin
+    form1.Button1.Enabled := false;
+//  CmdLine := PChar('"' + ExtractFilePath(Application.ExeName) + 'openvpn.exe" --config 1.ovpn');
+//  WorkDir := PChar(Application.ExeName);
+  ConsoleIdx := OpenConsole(pchar(CmdLine), pchar(WorkDir), SW_HIDE, @ProcInfo, OnConsoleOutput);
+  Result := ConsoleIdx <> -1;
+//  if ConsoleIdx = -1 then
+//  begin
+//  Application.MessageBox('启动openvpn失败！', PChar(Application.Title), MB_OK +
+//  MB_ICONWARNING);
+//  end
+end;
+
+
+{ 调用
+OVPN('"' + ExtractFilePath(Application.ExeName) + 'openvpn.exe" --config 1.ovpn',
+      extractfiledir(Application.ExeName))
+}
+
+
+
+
+
+{正常退出关闭软件}
+procedure CVPN;
+begin
+    form1.Button1.Enabled := false;
+    ConsoleInputF4(ConsoleIdx);
+  if ProcInfo.hProcess <> 0 then
+  begin
+    WaitForSingleObject(ProcInfo.hProcess, INFINITE);
+    closeconsole(consoleidx);
+    UserNameSent:= False;
+    PasswordSent:= False;
+    Completed := False;
+    SIGTERM := False;
+    wrong := False;
+    RESOLVE := False;
+    form1.Button1.Enabled := true ;
+    form1.Button1.Caption := '连接';
+  end;
+end;
+
+
+
+
+{窗口关闭时询问是否关闭
+procedure TForm1.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+begin
+if MessageBox(Handle, '确认要退出并断开吗?', '疾风OpenVPN', MB_YESNO or MB_ICONQUESTION or MB_DEFBUTTON2) = IDYES then
+    begin
+        if CanClose = true then
+        begin
+          CVPN;
+          application.Terminate;
+        end;
+    end
+    else
+      begin
+        CanClose := false;
+      end;
+end;
+}
+
+
+{点击按钮1
+procedure TForm1.Button1Click(Sender: TObject);
+begin
+  if button1.caption = '连接' then
+  begin
+    OVPN;
+  end else
+  if button1.caption = '断开' then
+  begin
+    CVPN;
+  end;
+
+end;
+}
+
+
+
+end.
